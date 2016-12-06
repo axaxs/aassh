@@ -63,10 +63,24 @@ func (c *SSHClient) Close() error {
 
 // NewSSHClient returns a new SSHClient object.
 // hostport should be in format server.name:22
-func NewSSHClient(username, hostport string) (*SSHClient, error) {
+// password is optional.  it is tried instead of keys if not blank
+func NewSSHClient(username, password, hostport string) (*SSHClient, error) {
 	var client *ssh.Client
 	var err error
 	var key ssh.Signer
+	if password != "" {
+		cfg := &ssh.ClientConfig{
+			User: username,
+			Auth: []ssh.AuthMethod{ssh.Password(password)},
+		}
+		client, err = ssh.Dial("tcp", hostport, cfg)
+		if err != nil {
+			return nil, err
+		}
+
+		return &SSHClient{client: client}, nil
+	}
+
 	for _, v := range []string{"id_rsa", "id_dsa"} {
 		key, err = getKey(v)
 		if err != nil {
@@ -82,9 +96,10 @@ func NewSSHClient(username, hostport string) (*SSHClient, error) {
 		}
 		break
 	}
+
 	if err != nil {
 		return nil, err
 	}
-	sshc := &SSHClient{client: client}
-	return sshc, nil
+
+	return &SSHClient{client: client}, nil
 }
